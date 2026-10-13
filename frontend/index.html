@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SurveyLab — опитування для викладачів</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 680px; margin: 40px auto; padding: 0 16px; color: #1d2433; }
+    h1 { margin-bottom: 4px; }
+    .lead { color: #5b6475; margin-top: 0; }
+    .status { padding: 10px 14px; border-radius: 6px; margin: 20px 0; }
+    .ok { background: #dff3e4; }
+    .error { background: #f9dcdc; }
+    input { padding: 10px; width: 100%; box-sizing: border-box; margin-bottom: 10px; }
+    button { padding: 10px 18px; cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { padding: 12px 14px; background: #f1f3f7; margin: 6px 0; border-radius: 6px; }
+    li small { color: #5b6475; display: block; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <h1>SurveyLab</h1>
+  <p class="lead">Опитування й тести для викладачів закладів вищої освіти</p>
+  <div id="status" class="status">Перевірка стану API...</div>
+
+  <h2>Нове опитування з шаблону «Оцінювання якості курсу»</h2>
+  <input type="text" id="title" placeholder="Назва, наприклад: Оцінювання курсу «Основи DevOps», КН-41">
+  <button onclick="createSurvey()">Створити опитування</button>
+
+  <h2>Мої опитування</h2>
+  <ul id="surveys"></ul>
+
+  <script>
+    // Шаблон з ЛР1: оцінка 1–5, одиночний вибір і відкрита відповідь
+    const TEMPLATE = [
+      { text: 'Оцініть курс за шкалою від 1 до 5', type: 'rating' },
+      { text: 'Що було найкориснішим?', type: 'single_choice',
+        options: ['Лекції', 'Практичні заняття', 'Самостійна робота'] },
+      { text: 'Що варто покращити в курсі?', type: 'open_text' }
+    ];
+
+    async function checkHealth() {
+      const box = document.getElementById('status');
+      try {
+        const data = await (await fetch('/health')).json();
+        box.textContent = 'Стан API: ' + data.status + ', сховище: ' + data.storage;
+        box.className = 'status ok';
+      } catch (err) {
+        box.textContent = 'API недоступний: ' + err.message;
+        box.className = 'status error';
+      }
+    }
+
+    async function loadSurveys() {
+      const surveys = await (await fetch('/api/surveys')).json();
+      document.getElementById('surveys').innerHTML = surveys.map(s =>
+        '<li>#' + s.id + ' ' + s.title + '<small>Питань: ' + s.questions.length + '</small></li>'
+      ).join('');
+    }
+
+    async function createSurvey() {
+      const title = document.getElementById('title').value.trim();
+      if (!title) return;
+      await fetch('/api/surveys', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, questions: TEMPLATE })
+      });
+      document.getElementById('title').value = '';
+      loadSurveys();
+    }
+
+    checkHealth();
+    loadSurveys();
+  </script>
+</body>
+</html>

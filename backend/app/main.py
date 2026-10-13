@@ -1,17 +1,28 @@
+import logging
 from typing import List
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 
+from .config import APP_ENV
 from .schemas import Survey, SurveyCreate
-from .storage import SurveyStorage
+from .storage import create_storage
 
-app = FastAPI(title="SurveyLab API", version="0.1.0")
-storage = SurveyStorage()
+logging.basicConfig(level=logging.INFO, format="%(levelname)s:     %(message)s")
+logger = logging.getLogger("surveylab")
+
+app = FastAPI(title="SurveyLab API", version="0.2.0")
+storage = create_storage()
+logger.info("SurveyLab API started: env=%s, storage=%s", APP_ENV, storage.kind)
 
 
 @app.get("/health")
-def health() -> dict:
-    return {"status": "ok"}
+def health():
+    if not storage.ping():
+        return JSONResponse(
+            status_code=503, content={"status": "unavailable", "storage": storage.kind}
+        )
+    return {"status": "ok", "storage": storage.kind}
 
 
 @app.post("/api/surveys", response_model=Survey, status_code=201)

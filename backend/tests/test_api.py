@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app, storage
+from app.storage import SurveyStorage, create_storage
 
 client = TestClient(app)
 
@@ -21,7 +22,7 @@ def setup_function():
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "storage": "memory"}
 
 
 def test_create_and_get_survey():
@@ -56,3 +57,7 @@ def test_unsupported_question_type_rejected():
 def test_choice_question_needs_options():
     bad = {"title": "X", "questions": [{"text": "Q", "type": "single_choice", "options": ["A"]}]}
     assert client.post("/api/surveys", json=bad).status_code == 422
+
+
+def test_storage_selected_from_environment():
+    assert isinstance(create_storage(""), SurveyStorage)
