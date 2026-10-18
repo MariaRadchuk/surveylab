@@ -1,0 +1,129 @@
+# Бекенд: Deployment (поетапне оновлення без простою), Service, HPA і PodDisruptionBudget
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.backend.serviceName }}
+  labels:
+    app.kubernetes.io/name: backend
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0              # старий под вимикається лише коли новий готовий
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/instance: {{ .Release.Name }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.rolloutId }}
+        rollout-id: {{ .Values.rolloutId | quote }}
+        {{- end }}
+    spec:
+      initContainers:
+        - name: wait-for-db          # аналог depends_on: service_healthy з Compose
+          image: {{ .Values.db.image }}
+          command:
+            - sh
+            - -c
+            - until pg_isready -h {{ include "surveylab.dbHost" . }} -p 5432; do echo "очікування бази даних"; sleep 2; done
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}
+      containers:
+        - name: backend
+          image: {{ include "surveylab.image" (dict "root" . "name" .Values.backend.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.port }}
+          envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-db
+                  key: DATABASE_URL
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          lifecycle:
+            preStop:                 # даємо час прибрати под зі Service, перш ніж зупиняти процес
+              exec:
+                command: ["sleep", "10"]
+          startupProbe:              # чекаємо, поки застосунок підніметься і з'єднається з базою
+            httpGet: {path: /health, port: http}
+            periodSeconds: 3
+            failureThreshold: 30
+          readinessProbe:            # під отримує трафік лише коли /health відповідає
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+          livenessProbe:             # зависання застосунку веде до перезапуску контейнера
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.serviceName }}
+  labels:
+    app.kubernetes.io/name: backend
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: {{ .Values.backend.port }}
+      targetPort: http
+---
+{{- if .Values.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ .Values.backend.serviceName }}
+  labels:
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ .Values.backend.serviceName }}
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.backend.autoscaling.targetCPUUtilizationPercentage }}
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: {{ .Values.backend.autoscaling.scaleDownStabilizationSeconds }}
+---
+{{- end }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .Values.backend.serviceName }}
+  labels:
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1                    # під час обслуговування вузла лишається щонайменше один под
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/instance: {{ .Release.Name }}

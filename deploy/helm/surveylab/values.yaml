@@ -1,0 +1,58 @@
+# Значення за замовчуванням для діаграми SurveyLab.
+# Параметри середовища staging перевизначаються у values-staging.yaml,
+# секрети (пароль бази) передаються лише через --set і в репозиторії не зберігаються.
+
+image:
+  registry: ghcr.io/mariaradchuk     # реєстр образів, куди їх публікує конвеєр
+  tag: ""                            # тег образів = SHA коміту (задає конвеєр)
+  pullPolicy: IfNotPresent
+
+# Налаштування застосунку, які потрапляють у ConfigMap
+config:
+  appEnv: staging
+
+# PostgreSQL
+db:
+  image: postgres:15-alpine
+  user: surveylab
+  name: surveylab
+  password: change-me                # перевизначається: --set db.password=...
+  storage: 1Gi
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 300m, memory: 256Mi}
+
+# Бекенд (FastAPI): приймає запити до опитувань
+backend:
+  serviceName: backend               # ім'я має збігатися з proxy_pass у frontend/nginx.conf
+  image: surveylab-backend
+  port: 8000
+  replicaCount: 2
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: 300m, memory: 256Mi}
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 60
+    scaleDownStabilizationSeconds: 60
+
+# Фронтенд (Nginx + сторінка викладача)
+frontend:
+  serviceName: frontend
+  image: surveylab-frontend
+  port: 80
+  replicaCount: 2
+  resources:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 100m, memory: 64Mi}
+
+# Зовнішній доступ
+ingress:
+  enabled: true
+  className: nginx
+  host: staging.surveylab.local
+
+# Змінюється при кожному розгортанні, щоб примусово оновити поди (необов'язково)
+rolloutId: ""

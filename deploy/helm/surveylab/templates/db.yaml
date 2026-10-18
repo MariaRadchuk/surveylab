@@ -1,0 +1,68 @@
+# PostgreSQL: StatefulSet із постійним томом і Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "surveylab.dbHost" . }}
+  labels:
+    app.kubernetes.io/name: db
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  selector:
+    app.kubernetes.io/name: db
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "surveylab.dbHost" . }}
+  labels:
+    app.kubernetes.io/name: db
+    {{- include "surveylab.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "surveylab.dbHost" . }}
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: db
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.db.image }}
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: {{ .Release.Name }}-db
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          resources:
+            {{- toYaml .Values.db.resources | nindent 12 }}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: {{ .Values.db.storage }}
