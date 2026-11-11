@@ -1,0 +1,12 @@
+---
+surveylab_dir: /opt/surveylab
+image_registry: ghcr.io/mariaradchuk
+image_tag: 620f56bb74686c6ea2a76199d8133d07b7c32c6c
+app_env: staging
+db_user: surveylab
+db_name: surveylab
+db_password: "{{ vault_db_password }}"   # значення зберігається зашифрованим у vault.yml
+frontend_port: 8080                      # порт на localhost, куди публікується frontend
+server_name: surveylab.local
+deploy_user: deploy
+base_packages: [curl, ca-certificates, python3, git]

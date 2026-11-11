@@ -1,0 +1,17 @@
+---
+- name: Оновити кеш apt
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Встановити базові пакети
+  apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Створити користувача для розгортання
+  user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: yes

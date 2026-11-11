@@ -1,0 +1,28 @@
+---
+- name: Створити каталог застосунку
+  file:
+    path: "{{ surveylab_dir }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    mode: '0755'
+
+- name: Згенерувати docker-compose.yml із шаблону
+  template:
+    src: docker-compose.yml.j2
+    dest: "{{ surveylab_dir }}/docker-compose.yml"
+    owner: "{{ deploy_user }}"
+    mode: '0644'
+
+- name: Записати секрети в .env (доступ лише власнику)
+  template:
+    src: env.j2
+    dest: "{{ surveylab_dir }}/.env"
+    owner: "{{ deploy_user }}"
+    mode: '0600'
+  no_log: true
+
+- name: Запустити стек SurveyLab
+  community.docker.docker_compose_v2:
+    project_src: "{{ surveylab_dir }}"
+    state: present
+    pull: missing

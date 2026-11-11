@@ -1,0 +1,58 @@
+name: Ansible
+
+on:
+  push:
+    paths: ["infra/ansible/**"]
+  pull_request:
+    paths: ["infra/ansible/**"]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Розгорнути на production (потрібне підтвердження в середовищі production)"
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    name: Перевірка синтаксису
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/ansible
+    steps:
+      - uses: actions/checkout@v4
+      - name: Встановити Ansible
+        run: |
+          pip install ansible-core
+          ansible-galaxy collection install community.docker
+      - name: Перевірити синтаксис плейбука
+        run: ansible-playbook site.yml --syntax-check
+
+  deploy-production:
+    name: Розгортання на production
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy
+    runs-on: ubuntu-latest
+    environment: production   # у налаштуваннях середовища задано обов'язкових рецензентів
+    defaults:
+      run:
+        working-directory: infra/ansible
+    steps:
+      - uses: actions/checkout@v4
+      - name: Встановити Ansible
+        run: |
+          pip install ansible-core
+          ansible-galaxy collection install community.docker
+      - name: Підготувати SSH-ключ і пароль vault із секретів
+        run: |
+          install -m 600 /dev/null ~/deploy_key
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/deploy_key
+          echo "${{ secrets.ANSIBLE_VAULT_PASSWORD }}" > ~/vault_pass
+      - name: Пробний запуск (--check)
+        run: >
+          ansible-playbook -i inventory/production.ini site.yml --check --diff
+          --private-key ~/deploy_key --vault-password-file ~/vault_pass
+      - name: Застосувати конфігурацію
+        run: >
+          ansible-playbook -i inventory/production.ini site.yml
+          --private-key ~/deploy_key --vault-password-file ~/vault_pass
