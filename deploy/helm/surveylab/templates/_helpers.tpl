@@ -16,3 +16,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
 {{- define "surveylab.dbHost" -}}
 {{ .Release.Name }}-db
 {{- end }}
+
+{{/* Ім'я Secret з обліковими даними БД: власний (db.existingSecret) або створений діаграмою */}}
+{{- define "surveylab.dbSecret" -}}
+{{- default (printf "%s-db" .Release.Name) .Values.db.existingSecret -}}
+{{- end -}}

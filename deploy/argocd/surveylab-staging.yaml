@@ -1,0 +1,27 @@
+# GitOps (етап 5 плану): ArgoCD розгортає Helm-діаграму SurveyLab з Git у кластер.
+# Стан кластера змінюється лише коммітом: replicaCount, тег образу тощо — у values-gitops.yaml.
+# Секрет бази даних (surveylab-db) у Git не зберігається: його створюють у кластері окремо.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: surveylab-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/MariaRadchuk/surveylab.git
+    targetRevision: stage6-final
+    path: deploy/helm/surveylab
+    helm:
+      releaseName: surveylab
+      valueFiles:
+        - values-gitops.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: surveylab-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,62 @@
+name: SurveyLab Tests
+
+# Етап 4 плану: автоматизація тестування (Newman, k6, Cypress) на піднятому стеку Compose,
+# а також перевірка конфігурації моніторингу та Helm-діаграми.
+on:
+  push:
+    branches: [main, develop, stage6-final]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'tests/**'
+      - 'deploy/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    name: API, навантаження та E2E
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start SurveyLab stack
+        run: |
+          cp .env.example .env
+          docker compose up -d --build --wait
+
+      - name: API tests (Newman)
+        run: npx --yes newman run tests/postman/surveylab.postman_collection.json
+
+      - name: Load test (k6)
+        uses: grafana/setup-k6-action@v1
+      - run: k6 run tests/k6/load.js
+
+      - name: E2E tests (Cypress)
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: tests/e2e
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+
+  config-checks:
+    name: Конфігурація моніторингу та Helm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Prometheus config and alert rules
+        run: |
+          docker run --rm -v "$PWD/deploy/monitoring:/m" --entrypoint promtool \
+            prom/prometheus:v3.5.0 check rules /m/alerts.yml
+          docker run --rm -v "$PWD/deploy/monitoring:/m" --entrypoint promtool \
+            prom/prometheus:v3.5.0 check config /m/prometheus.yml
+
+      - name: Lint Helm chart (staging and GitOps values)
+        run: |
+          helm lint deploy/helm/surveylab -f deploy/helm/surveylab/values-staging.yaml
+          helm lint deploy/helm/surveylab -f deploy/helm/surveylab/values-gitops.yaml

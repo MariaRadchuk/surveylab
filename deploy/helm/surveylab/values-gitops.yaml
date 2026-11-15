@@ -1,0 +1,16 @@
+# Параметри середовища для ArgoCD (GitOps): усе, що змінює стан кластера, змінюється лише коммітом.
+# Секрет бази даних створюється поза Git (kubectl create secret ... surveylab-db) і лише підключається.
+image:
+  tag: stage6-arm64                  # образи зібрано локально для arm64 і завантажено на вузол кластера
+config:
+  appEnv: staging
+db:
+  existingSecret: surveylab-db
+backend:
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+frontend:
+  replicaCount: 1
+ingress:
+  enabled: false

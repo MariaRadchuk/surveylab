@@ -41,3 +41,25 @@
     cp .env.example .env
     docker compose up -d --build
     # http://localhost:8081
+
+5. Етапи 4–5 плану (ЛР7) — тестування, спостережуваність і GitOps:
+   1. `backend/app/observability.py` — метрики Prometheus (`/metrics`: кількість запитів за кодом,
+      гістограма затримки, лічильник створених опитувань) і трасування OpenTelemetry (вмикається
+      змінною `OTEL_EXPORTER_OTLP_ENDPOINT`);
+   2. `tests/` — Postman/Newman (API), k6 (навантаження з порогами), Cypress (E2E сторінки викладача);
+      `.github/workflows/tests.yml` запускає їх на піднятому стеку Compose;
+   3. `deploy/monitoring/` — Prometheus, Alertmanager (webhook-отримувач), Grafana (дашборд
+      «SurveyLab: огляд»), Loki + Promtail, Jaeger, node-exporter;
+   4. `deploy/argocd/surveylab-staging.yaml` і `deploy/helm/surveylab/values-gitops.yaml` —
+      розгортання Helm-діаграми з Git за допомогою ArgoCD (автосинхронізація, prune, selfHeal).
+
+Запуск стека спостережуваності поруч із застосунком:
+
+    docker compose up -d --build
+    docker compose -p surveylab-monitoring --env-file .env \
+      -f deploy/monitoring/docker-compose.yml up -d
+    # Grafana http://localhost:3000, Prometheus http://localhost:9090,
+    # Alertmanager http://localhost:9093, Jaeger http://localhost:16686
+
+Тести: `newman run tests/postman/surveylab.postman_collection.json`,
+`k6 run tests/k6/load.js`, `cd tests/e2e && npm ci && npx cypress run`.

@@ -17,6 +17,7 @@ db:
   user: surveylab
   name: surveylab
   password: change-me                # перевизначається: --set db.password=...
+  existingSecret: ""                 # ім'я готового Secret (ключі POSTGRES_*, DATABASE_URL) — для GitOps
   storage: 1Gi
   resources:
     requests: {cpu: 50m, memory: 128Mi}

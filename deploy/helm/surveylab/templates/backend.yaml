@@ -25,6 +25,9 @@ spec:
         app.kubernetes.io/name: backend
         app.kubernetes.io/instance: {{ .Release.Name }}
       annotations:
+        prometheus.io/scrape: "true"        # метрики для Prometheus (шлях /metrics)
+        prometheus.io/port: {{ .Values.backend.port | quote }}
+        prometheus.io/path: /metrics
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- if .Values.rolloutId }}
         rollout-id: {{ .Values.rolloutId | quote }}
@@ -54,7 +57,7 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-db
+                  name: {{ include "surveylab.dbSecret" . }}
                   key: DATABASE_URL
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
