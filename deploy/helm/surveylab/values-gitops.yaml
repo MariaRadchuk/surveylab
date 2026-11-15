@@ -12,5 +12,8 @@ backend:
     enabled: false
 frontend:
   replicaCount: 1
+  resources:                         # більше CPU: за 100m Nginx не встигав стартувати до liveness-проби
+    requests: {cpu: 50m, memory: 32Mi}
+    limits: {cpu: 500m, memory: 64Mi}
 ingress:
   enabled: false
