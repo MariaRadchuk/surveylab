@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import app, storage
+from app.storage import SurveyStorage, create_storage
 
 client = TestClient(app)
 
@@ -21,7 +22,7 @@ def setup_function():
 def test_health():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "storage": "memory"}
 
 
 def test_create_and_get_survey():
@@ -56,3 +57,22 @@ def test_unsupported_question_type_rejected():
 def test_choice_question_needs_options():
     bad = {"title": "X", "questions": [{"text": "Q", "type": "single_choice", "options": ["A"]}]}
     assert client.post("/api/surveys", json=bad).status_code == 422
+
+
+def test_storage_selected_from_environment():
+    assert isinstance(create_storage(""), SurveyStorage)
+
+
+def test_metrics_endpoint_exposes_request_counters():
+    client.get("/health")
+    body = client.get("/metrics").text
+    assert "surveylab_http_requests_total" in body
+    assert 'path="/health"' in body
+
+
+def test_created_surveys_are_counted():
+    from prometheus_client import REGISTRY
+
+    before = REGISTRY.get_sample_value("surveylab_surveys_created_total") or 0
+    client.post("/api/surveys", json=VALID)
+    assert REGISTRY.get_sample_value("surveylab_surveys_created_total") == before + 1

@@ -1,0 +1,72 @@
+# Стек спостережуваності SurveyLab (етап 5 плану): метрики, сповіщення, журнали, трасування.
+# Підключається до мережі Compose основного застосунку (SURVEYLAB_NETWORK).
+services:
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=15d'
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+
+  alert-sink:
+    # Умовний отримувач сповіщень: друкує вміст webhook-запитів Alertmanager
+    image: python:3.12-alpine
+    volumes:
+      - ./alert_sink.py:/app/alert_sink.py:ro
+    command: python -u /app/alert_sink.py
+
+  node-exporter:
+    image: prom/node-exporter:v1.9.1
+    ports:
+      - "9100:9100"
+
+  loki:
+    image: grafana/loki:2.9.0
+    ports:
+      - "3100:3100"
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./promtail-config.yaml:/etc/promtail/config.yaml:ro
+    command: -config.file=/etc/promtail/config.yaml
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?задайте GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: ${SURVEYLAB_NETWORK:-surveylab_default}
+    external: true

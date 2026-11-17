@@ -1,0 +1,19 @@
+# Тест helm test: через фронтенд перевіряє, що бекенд відповідає і працює з PostgreSQL
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-test
+  labels:
+    {{- include "surveylab.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: check
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          wget -q -O- http://{{ .Values.frontend.serviceName }}/health | grep '"storage":"postgres"'

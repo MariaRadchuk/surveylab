@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "SurveyLab API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [{ "key": "baseUrl", "value": "http://localhost:8081" }],
+  "item": [
+    {
+      "name": "Перевірка стану",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 200', () => pm.response.to.have.status(200));",
+        "pm.test('API справне', () => pm.expect(pm.response.json().status).to.eql('ok'));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+    },
+    {
+      "name": "Створення опитування",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 201', () => pm.response.to.have.status(201));",
+        "const body = pm.response.json();",
+        "pm.test('є ідентифікатор', () => pm.expect(body.id).to.be.a('number'));",
+        "pm.test('збережено 3 питання', () => pm.expect(body.questions.length).to.eql(3));",
+        "pm.collectionVariables.set('surveyId', body.id);"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/surveys",
+        "body": { "mode": "raw", "raw": "{\"title\":\"Оцінювання курсу (Newman)\",\"questions\":[{\"text\":\"Оцініть курс\",\"type\":\"rating\"},{\"text\":\"Що найкорисніше?\",\"type\":\"single_choice\",\"options\":[\"Лекції\",\"Практика\"]},{\"text\":\"Що покращити?\",\"type\":\"open_text\"}]}" }
+      }
+    },
+    {
+      "name": "Отримання опитування за id",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 200', () => pm.response.to.have.status(200));",
+        "pm.test('назва збігається', () => pm.expect(pm.response.json().title).to.include('Newman'));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/surveys/{{surveyId}}" }
+    },
+    {
+      "name": "Список опитувань",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 200', () => pm.response.to.have.status(200));",
+        "pm.test('список непорожній', () => pm.expect(pm.response.json().length).to.be.above(0));",
+        "pm.test('відповідь швидша за 500 мс', () => pm.expect(pm.response.responseTime).to.be.below(500));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/surveys" }
+    },
+    {
+      "name": "Неіснуюче опитування",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 404', () => pm.response.to.have.status(404));"
+      ] } }],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/surveys/999999" }
+    },
+    {
+      "name": "Некоректне опитування (без питань)",
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('статус 422', () => pm.response.to.have.status(422));"
+      ] } }],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/surveys",
+        "body": { "mode": "raw", "raw": "{\"title\":\"Порожнє\",\"questions\":[]}" }
+      }
+    }
+  ]
+}

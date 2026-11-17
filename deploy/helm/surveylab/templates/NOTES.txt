@@ -1,0 +1,6 @@
+SurveyLab {{ .Chart.AppVersion }} розгорнуто в просторі імен {{ .Release.Namespace }}.
+Перевірити стан:   kubectl -n {{ .Release.Namespace }} get pods,svc,ingress,hpa
+Перевірити роботу: helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+{{- if .Values.ingress.enabled }}
+Сторінка викладача: http://{{ .Values.ingress.host }}/
+{{- end }}

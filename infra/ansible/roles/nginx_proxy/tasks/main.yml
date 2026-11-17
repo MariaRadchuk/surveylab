@@ -1,0 +1,30 @@
+---
+- name: Встановити nginx
+  apt:
+    name: nginx
+    state: present
+
+- name: Налаштувати зворотний проксі на frontend
+  template:
+    src: surveylab.conf.j2
+    dest: /etc/nginx/sites-available/surveylab
+  notify: Reload nginx
+
+- name: Увімкнути сайт
+  file:
+    src: /etc/nginx/sites-available/surveylab
+    dest: /etc/nginx/sites-enabled/surveylab
+    state: link
+  notify: Reload nginx
+
+- name: Вимкнути типовий сайт nginx
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Запустити nginx
+  service:
+    name: nginx
+    state: started
+    enabled: yes

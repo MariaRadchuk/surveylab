@@ -1,0 +1,49 @@
+groups:
+  - name: surveylab-alerts
+    rules:
+      - alert: SurveyLabBackendDown
+        expr: up{job="surveylab-backend"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Бекенд SurveyLab недоступний"
+          description: "Prometheus не може зібрати метрики з {{ $labels.instance }} понад 30 секунд."
+
+      - alert: SurveyLabHighErrorRate
+        expr: |
+          sum(rate(surveylab_http_requests_total{status=~"5.."}[2m]))
+            / sum(rate(surveylab_http_requests_total[2m])) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Понад 5 % запитів завершуються помилкою 5xx"
+
+      - alert: SurveyLabHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(surveylab_http_request_duration_seconds_bucket[5m]))) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 затримки API перевищує 0,5 с"
+
+  - name: node-alerts
+    rules:
+      - alert: HighCPU
+        expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High CPU usage
+
+      - alert: HighMemory
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: High memory usage

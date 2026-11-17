@@ -1,0 +1,29 @@
+---
+- name: Встановити Docker і плагін Compose
+  apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+    state: present
+
+- name: Налаштувати драйвер сховища Docker (лише коли задано docker_storage_driver)
+  template:
+    src: daemon.json.j2
+    dest: /etc/docker/daemon.json
+  when: docker_storage_driver is defined
+  notify: Restart docker
+
+- name: Запустити службу Docker
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Застосувати зміни конфігурації Docker одразу
+  meta: flush_handlers
+
+- name: Дозволити користувачу розгортання працювати з Docker
+  user:
+    name: "{{ deploy_user }}"
+    groups: docker
+    append: yes

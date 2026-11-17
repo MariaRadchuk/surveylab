@@ -1,0 +1,11 @@
+---
+- name: Встановити node_exporter для Prometheus
+  apt:
+    name: prometheus-node-exporter
+    state: present
+
+- name: Запустити node_exporter
+  service:
+    name: prometheus-node-exporter
+    state: started
+    enabled: yes
